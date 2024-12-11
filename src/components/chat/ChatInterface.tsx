@@ -2,10 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { MessageSquare, Send, History } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { MessageSquare, Send } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { useNavigate } from "react-router-dom";
 
 interface Message {
   id: number;
@@ -19,14 +17,12 @@ export const ChatInterface = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    // Add welcome message when chat starts
     if (messages.length === 0) {
       const welcomeMessage: Message = {
         id: Date.now(),
-        text: "Hello! I'm your AI assistant. How can I help you today?",
+        text: "Hello! I'm your AI assistant. I can help you with various tasks including creating websites. How can I assist you today?",
         sender: "ai",
         timestamp: new Date().toISOString(),
       };
@@ -34,39 +30,89 @@ export const ChatInterface = () => {
     }
   }, []);
 
-  const fetchChatResponse = async (userMessage: string) => {
+  const fetchJokeResponse = async () => {
     try {
-      // Using free API from API Ninjas for demonstration
-      const response = await fetch('https://api.api-ninjas.com/v1/facts?limit=1', {
-        headers: {
-          'X-Api-Key': 'YOUR_API_NINJAS_KEY',
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await fetch('https://official-joke-api.appspot.com/random_joke');
       const data = await response.json();
-      return data[0]?.fact || "I'm sorry, I couldn't generate a response at the moment.";
+      return `Here's a joke: ${data.setup} ${data.punchline}`;
     } catch (error) {
-      console.error('Error:', error);
-      return "I apologize, but I'm having trouble connecting to my knowledge base right now.";
+      console.error('Joke API Error:', error);
+      return null;
     }
   };
 
-  const saveMessageToHistory = async (message: Message) => {
+  const fetchQuoteResponse = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('chat_history').insert([
-          {
-            user_id: user.id,
-            message: message.text,
-            sender: message.sender,
-            timestamp: message.timestamp
-          }
-        ]);
-      }
+      const response = await fetch('https://api.quotable.io/random');
+      const data = await response.json();
+      return `Here's an inspiring quote: "${data.content}" - ${data.author}`;
     } catch (error) {
-      console.error('Error saving message:', error);
+      console.error('Quote API Error:', error);
+      return null;
     }
+  };
+
+  const fetchFactResponse = async () => {
+    try {
+      const response = await fetch('https://uselessfacts.jsph.pl/random.json?language=en');
+      const data = await response.json();
+      return `Here's an interesting fact: ${data.text}`;
+    } catch (error) {
+      console.error('Fact API Error:', error);
+      return null;
+    }
+  };
+
+  const generateWebDevResponse = (userInput: string) => {
+    if (userInput.toLowerCase().includes('create website') || userInput.toLowerCase().includes('make website')) {
+      return `Here's a suggestion for creating a website:
+
+1. HTML Structure:
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Your Website</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="bg-gray-800 p-4">
+        <div class="container mx-auto">
+            <h1 class="text-white text-xl">Your Brand</h1>
+        </div>
+    </nav>
+    <main class="container mx-auto p-4">
+        <h2 class="text-2xl mb-4">Welcome to Your Website</h2>
+        <p>Add your content here!</p>
+    </main>
+</body>
+</html>
+\`\`\`
+
+Would you like me to explain any part of this code or suggest more features?`;
+    }
+    return null;
+  };
+
+  const getChatResponse = async (userMessage: string) => {
+    const webDevResponse = generateWebDevResponse(userMessage);
+    if (webDevResponse) return webDevResponse;
+
+    const responses = await Promise.all([
+      fetchJokeResponse(),
+      fetchQuoteResponse(),
+      fetchFactResponse()
+    ]);
+
+    const validResponses = responses.filter(response => response !== null);
+    
+    if (validResponses.length > 0) {
+      const randomIndex = Math.floor(Math.random() * validResponses.length);
+      return validResponses[randomIndex];
+    }
+
+    return "I'm here to help! I can tell jokes, share quotes, provide facts, or help you create websites. What would you like to know?";
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -84,10 +130,8 @@ export const ChatInterface = () => {
     setInput("");
     setIsLoading(true);
 
-    await saveMessageToHistory(userMessage);
-
     try {
-      const aiResponse = await fetchChatResponse(input);
+      const aiResponse = await getChatResponse(input);
       const aiMessage: Message = {
         id: Date.now(),
         text: aiResponse,
@@ -96,7 +140,6 @@ export const ChatInterface = () => {
       };
       
       setMessages((prev) => [...prev, aiMessage]);
-      await saveMessageToHistory(aiMessage);
     } catch (error) {
       toast({
         title: "Error",
@@ -130,7 +173,7 @@ export const ChatInterface = () => {
                   <MessageSquare className="w-4 h-4 mt-1" />
                 )}
                 <div>
-                  <p className="text-sm">{message.text}</p>
+                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                   <span className="text-xs opacity-50">
                     {new Date(message.timestamp).toLocaleTimeString()}
                   </span>
@@ -161,9 +204,6 @@ export const ChatInterface = () => {
           />
           <Button type="submit" disabled={!input.trim() || isLoading}>
             <Send className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/history')}>
-            <History className="h-4 w-4" />
           </Button>
         </div>
       </form>
