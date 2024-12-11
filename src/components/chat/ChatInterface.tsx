@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { MessageSquare, Send, History } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface Message {
   id: number;
@@ -18,6 +19,7 @@ export const ChatInterface = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Add welcome message when chat starts
@@ -82,7 +84,6 @@ export const ChatInterface = () => {
     setInput("");
     setIsLoading(true);
 
-    // Save user message to history
     await saveMessageToHistory(userMessage);
 
     try {
